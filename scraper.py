@@ -17,7 +17,10 @@ class Scraper:
     def getSoup(self):
         return self._soup
 
-    def find(self, tag, elementType, attributeSet):
+    def find(self, tag, elementType, attributeSet=(None, None)):
+        if attributeSet == (None, None):
+            return tag.find(elementType)
+
         attribute, value = attributeSet
         if attribute == "class":
             return tag.find(elementType, _class=value)
