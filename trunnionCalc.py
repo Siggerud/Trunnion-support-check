@@ -1,13 +1,14 @@
 from math import pi
 
 class TrunnionCalc:
-    def __init__(self, pipeData, trunnionData, materialData):
+    # calculates stresses in trunnion
+    def __init__(self, pipeData, trunnionData, hotStress):
         self._pipeOutDia, self._pipeThk, self._pipeMillTol, self._corrAllow = pipeData
         self._trunnionOutDia, self._trunnionThk, self._trunnionMillTol = trunnionData[:3]
         self._trunnionHeight, self._repadThk, self._typeOfTrunnion = trunnionData[3:]
-        self._yieldStrength, self._hotStress = materialData
-        self._tc = self._getMinimumPipeThk("pipe")
-        self._trunnionArea = self._getTrunnionArea()
+        self._hotStress = hotStress
+        self._tc = self._get_minimum_pipe_thk("pipe")
+        self._trunnionArea = self._get_trunnion_area()
         self._Fl = 0
         self._Fc = 0
         self._Fa = 0
@@ -33,15 +34,17 @@ class TrunnionCalc:
         self._Svm = 0
         self._bendingStressUtilization = 0
 
-    def _getTrunnionArea(self):
-        trunnionThickness = self._getMinimumPipeThk("trunnion")
+    # gets the crossection area of the trunnion
+    def _get_trunnion_area(self):
+        trunnionThickness = self._get_minimum_pipe_thk("trunnion")
         outerRadius = self._trunnionOutDia / 2
         innerRadius = outerRadius - trunnionThickness
         area = pi * (outerRadius**2 - innerRadius**2)
 
         return area
 
-    def _getMinimumPipeThk(self, keyWord):
+    # gets the minimum pipe thickness of either pipe or trunnion
+    def _get_minimum_pipe_thk(self, keyWord):
         if keyWord == "pipe":
             millTol = self._pipeMillTol
             corrosionMargin = self._corrAllow
@@ -55,28 +58,32 @@ class TrunnionCalc:
 
         return minPipeThk
 
-    def checkTrunnion(self, pressure, axialForce, circumForce, lineForce):
+    # check that trunnion is within allowable
+    def check_trunnion(self, pressure, axialForce, circumForce, lineForce):
         self._Fa = axialForce
         self._Fc = circumForce
         self._Fl = lineForce
         self._pressure = pressure / 10 # bar to MPA
-        self._calculateLineLoads()
-        self._calculateTrunnionStress()
+        self._calculate_line_loads()
+        self._calculate_trunnion_stress()
 
-    def _calculateLineLoads(self):
+    # calculates line loads for trunnion
+    def _calculate_line_loads(self):
         height = self._trunnionHeight
         radius = self._trunnionOutDia / 2
         self._FFl = self._Fl * height / (pi * radius**2)
         self._FFc = self._Fc * height / (pi * radius**2)
         self._FFa = self._Fa / (2 * pi * radius)
 
-    def _getAllowableStressFactor(self):
+    # sets the stress factor based on wether or not trunnion is on elbow
+    def _get_allowable_stress_factor(self):
         if self._typeOfTrunnion == "elbow":
             return 1
         else:
             return 1.5
 
-    def _calculateLocalStresses(self):
+    # calculates local stresses on pipe
+    def _calculate_local_stresses(self):
         pipeRadius = self._pipeOutDia / 2
 
         # get pressure stress
@@ -93,15 +100,17 @@ class TrunnionCalc:
         self._SlAndSaAndSlp = self._SL + self._SA + self._slp
         self._ScAndSaAndScp = self._SC + self._SA + self._scp
 
-        stressFactor = self._getAllowableStressFactor()
+        stressFactor = self._get_allowable_stress_factor()
+
         self._allowableLocalStress = stressFactor * self._hotStress
 
         self._localStressUtilization = max(self._SlAndSaAndSlp, self._ScAndSaAndScp) / self._allowableLocalStress
 
-    def _calculateBendingStress(self):
+    # calculates bending stress in trunnion
+    def _calculate_bending_stress(self):
         self._V = (self._Fl**2 + self._Fc**2)**0.5 # shear stress
         self._Mb = self._V * self._trunnionHeight # bending moment
-        self._Z = self._getSectionModulus() # section modulus
+        self._Z = self._get_section_modulus() # section modulus
         self._Sb = self._Mb / self._Z # bending stress
         self._Sn = self._Fa / self._trunnionArea # normal stress
         self._Ts = self._V / (0.5 * self._trunnionArea) # shear stress
@@ -110,13 +119,15 @@ class TrunnionCalc:
 
         self._bendingStressUtilization = self._Svm / self._allowableBendingStress
 
-    def _calculateTrunnionStress(self):
-        self._calculateLocalStresses()
-        self._calculateBendingStress()
+    # calculates local and bending stress
+    def _calculate_trunnion_stress(self):
+        self._calculate_local_stresses()
+        self._calculate_bending_stress()
 
-    def _getSectionModulus(self):
+    # get section modulus for trunnion
+    def _get_section_modulus(self):
         D = self._trunnionOutDia
-        trunnionThickness = self._getMinimumPipeThk("trunnion")
+        trunnionThickness = self._get_minimum_pipe_thk("trunnion")
         d = D - 2 * trunnionThickness
 
         z = (pi/32) * (D**4 - d**4)/D
